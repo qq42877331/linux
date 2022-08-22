@@ -6,39 +6,42 @@ echo "复制链接用浏览器打开，选择以kernel字样开头的较新版�
 read -p "上述步骤已经完成，可以进行下一步？  [ yes or no ]  :" yn
 
 if [ $yn == "y" -o $yn == "yes" ]
-then 
-  dir1=`pwd`
+	then
+	dir1=`pwd`
   pack_name=`ls -l ${dir1} |grep kernel*.rpm |awk -F " " '{print $9}'`
-
   rpm -ivh ${pack_name}
-
   #修改kernel.spec ，让新内核支持ocfs2模块
   line=$(cat -n $dir1/rpmbuild/SPECS/kernel.spec |grep "  mv \$i .config"|awk -F " " '{print $1}')
   sed -i "${line}i\  sed -i 's\/# CONFIG_OCFS2_FS is not set\/CONFIG_OCFS2_FS=m\/' \$i" $dir1/rpmbuild/SPECS/kernel.spec
   sed -i 's/\%define listnewconfig_fail 1/\%define listnewconfig_fail 0/' $dir1/rpmbuild/SPECS/kernel.spec
-
   #重装编译一次内核包，需要很长时间
-  rpmbuild -ba $dir1/rpmbuild/SPECS/kernel.spec
-
+  rpmbuild -ba $dir1/rpmbuild/SPECS/kernel.spec && echo -e "编译完成，下一步检查新版内核是否成功加载ocfs2模块\n"
   #安装新生成的内核rpm包
-  rpm -qpl $dir1/rpmbuild/RPMS/x86_64/${pack_name} |grep ocfs
-  rpm -ivh $dir1/rpmbuild/RPMS/x86_64/${pack_name}
-
-  #设置开机启动新版内核
-  sudo awk -F\' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg
-  grub2-set-default 0 
-  grub2-mkconfig -o /boot/grub2/grub.cfg
-
-  yn=""
-  read -p "kernel更新已经完成，你想现在重启此系统吗？ [ yes or no ]  :" yn
-  if [ $yn == "y" -o $yn == "yes" ]
-  then 
-    echo rebooting
-   else
-    echo "no reboot"
-   fi
+  new_pack=$(ll $dir1/rpmbuild/RPMS/x86_64/ |awk -F " " '{print $9}'|grep kernel-[0-9])
+  rpm -qpl $dir1/rpmbuild/RPMS/x86_64/${new_pack} |grep ocfs2
+  	if [ $? == 0 ]
+		then 
+			#开始安装新版本内核
+	  	rpm -ivh $dir1/rpmbuild/RPMS/x86_64/${new_pack}
+	  	
+			#设置开机启动新版内核
+	  	sudo awk -F\' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg
+	  	grub2-set-default 0 
+	  	grub2-mkconfig -o /boot/grub2/grub.cfg
+			
+			#询问是否要重启
+	  	yn=""
+	  	read -p "kernel更新已经完成，你想现在重启此系统吗？ [ yes or no ]  :" yn
+	  	if [ $yn == "y" -o $yn == "yes" ]
+	  		then 
+	    			reboot
+	   		else
+	    			echo -e "请在适当时候重启系统\n"
+	   	fi
+		else
+			echo -e "新版kernel中未能找到ocfs2模块，请检查kernel.spec配置\n"
  else
-  echo "请按要求准备好！"
+ 	echo -e  "一切准备好后，再次尝试！\n"
  fi
 
 

@@ -1,26 +1,25 @@
-# kernel compile ocfs2
-
-wget http://vault.centos.org/7.4.1708/updates/Source/SPackages/kernel-3.10.0-693.21.1.el7.src.rpm
+sysver=`cat /etc/redhat-release |awk '{print $4}'`
+kerver=`uname -r |awk -F '.' '{ print $1,$2,$3}'`
+echo https://mirrors.aliyun.com/centos-vault/$sysver/updates/Source/SPackages/   #浏览器打开返回的地址，下载最新kernel rpm包
 
 yum -y install rpm-build
 yum -y install gcc m4 net-tools bc xmlto asciidoc hmaccalc python-devel newt-devel perl pesign elfutils-devel zlib-devel binutils-devel bison audit-libs-devel java-devel numactl-devel pciutils-devel ncurses-devel perl-ExtUtils-Embed
 
-rpm -ivh kernel-3.10.0-693.21.1.el7.src.rpm
-cd /root/rpmbuild/SPECS/
-vi kernel.spec 
-# now run oldconfig over all the config files
-for i in *.config
-do
-  sed -i "s/# CONFIG_OCFS2_FS is not set/CONFIG_OCFS2_FS=m/" $i # add this line
-  mv $i .config
+#以kernel-3.10.0-957.27.2.el7.src.rpm为例
 
-%define listnewconfig_fail 0 # modify 1 to 0
+rpm -ivh kernel-3.10.0-957.27.2.el7.src.rpm
+
+cd /root/rpmbuild/SPECS/
+num=`cat -n kernel.spec |grep "for i in \*.conf"|head -n 1|awk '{print $1}'`
+num=$[$num + 2] ; echo $num
+sed -i "${num}a\  sed -i 's\/# CONFIG_OCFS2_FS is not set\/CONFIG_OCFS2_FS=m\/' \$i" kernel.spec
+sed -i 's/\%define listnewconfig_fail 1/\%define listnewconfig_fail 0/' kernel.spec 
 
 rpmbuild -ba kernel.spec
 
 cd /root/rpmbuild/RPMS/x86_64
-rpm -qpl kernel-3.10.0-693.21.1.el7.x86_64.rpm |grep ocfs
-rpm -ivh kernel-3.10.0-693.21.1.el7.x86_64.rpm
+rpm -qpl kernel-3.10.0-957.27.2.el7.src.rpm |grep ocfs
+rpm -ivh kernel-3.10.0-957.27.2.el7.src.rpm
 
 # install new kernel
 uname -r

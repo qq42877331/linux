@@ -1,15 +1,14 @@
 sysver=`cat /etc/redhat-release |awk '{print $4}'`
-kerver=`uname -r |awk -F '.' '{ print $1,$2,$3}'`
 echo https://mirrors.aliyun.com/centos-vault/$sysver/updates/Source/SPackages/   #浏览器打开返回的地址，下载最新kernel rpm包
 
 yum -y install gcc m4 net-tools bc xmlto asciidoc hmaccalc python-devel newt-devel perl pesign rpm-build\
 elfutils-devel zlib-devel binutils-devel bison audit-libs-devel java-devel numactl-devel pciutils-devel ncurses-devel perl-ExtUtils-Embed
 
 #以下载kernel-3.10.0-957.27.2.el7.src.rpm为例
-
+wget https://mirrors.aliyun.com/centos-vault/7.6.1810/updates/Source/SPackages/kernel-3.10.0-957.27.2.el7.src.rpm -O /root/kernel-3.10.0-957.27.2.el7.src.rpm
 rpm -ivh kernel-3.10.0-957.27.2.el7.src.rpm
 
-#修改kernel.spec文件两处内容
+#修改kernel.spec文件两处内容，开启新内核对oscf2的支持
 cd /root/rpmbuild/SPECS/
 num=`cat -n kernel.spec |grep "for i in \*.conf"|head -n 1|awk '{print $1}'`
 num=$[$num + 2] ; echo $num
@@ -24,11 +23,7 @@ cd /root/rpmbuild/RPMS/x86_64
 rpm -qpl kernel-3.10.0-957.27.2.el7.src.rpm |grep ocfs
 rpm -ivh kernel-3.10.0-957.27.2.el7.src.rpm
 
-# install new kernel
 uname -r
-
-yum -y install linux-firmware-20200124-999.4.git1eb2408c.el7.noarch.rpm
-yum -y install kernel-uek-4.14.35-1902.304.6.3.el7uek.x86_64.rpm
 
 cat /boot/grub2/grub.cfg |grep menuentry
 

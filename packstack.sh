@@ -7,8 +7,7 @@ mv ./rhel-osp-6.0-2015-02-23.2-x86_64.iso /iso/ &>/dev/null
 
 if [ ! -f /iso/rhel-server-7.1-x86_64-dvd.iso ] || [ ! -f /iso/rhel-osp-6.0-2015-02-23.2-x86_64.iso ]
 then
-	echo -e "检查/iso/目录是否存在下列文件\nrhel-server-7.1-x86_64-dvd.iso \nrhel-osp-6.0-2015-02-23.2-x86_64.iso \n" 
-	exit
+	echo -e "检查/iso/目录是否存在下列文件\nrhel-server-7.1-x86_64-dvd.iso \nrhel-osp-6.0-2015-02-23.2-x86_64.iso \n" && exit
 fi
 
 rm -rf /etc/yum.repos.d/*
@@ -29,34 +28,62 @@ yum install httpd chrony ntpdate expect -y
 if [ $? == 0 ] ;then echo -e "安装httpd chrony ntpdate expect成功\n" ;fi 
 
 
+echo -e "目前hosts文件内容如下：\n"
+cat /etc/hosts
+
 #判断是否需要改写hosts文件
-read -p"是否已经填写/etc/hosts文件？[yes or no] ：" yn
+read -p"上述/etc/hosts配置是否正确？[yes or no] ：" yn
 if [ $yn == "n" ] || [ $yn == "no" ]
 then 
+	read -p "input ntp_server ip :" ntpip
+	read -p "input controller_node ip :" conip
+	read -p "input compute_server ip :" comip
+	
+	#把变量写入hosts文件
+	cat <<EOF >>/etc/hosts
+	${ntpip}	ntp
+	${conip}	controller
+	${comip}	compute
+	EOF
 
-read -p "input ntp_server ip :" ntpip
-read -p "input controller_node ip :" conip
-read -p "input compute_server ip :" comip
+	echo -e "目前hosts文件内容如下：\n"
+	cat /etc/hosts
 
-cat <<EOF >>/etc/hosts
-${ntpip}	ntp
-${conip}	controller
-${comip}	compute
-EOF
 else 
-
-ntpip=`cat /etc/hosts |grep -v localhost |grep ntp |awk '{print $1}'`
-conip=`cat /etc/hosts |grep -v localhost |grep controller |awk '{print $1}'`
-comip=`cat /etc/hosts |grep -v localhost |grep compute |awk '{print $1}'`
+	#将hosts配置，读入相应变量中
+	ntpip=`cat /etc/hosts |grep -v localhost |grep ntp |awk '{print $1}'`
+	conip=`cat /etc/hosts |grep -v localhost |grep controller |awk '{print $1}'`
+	comip=`cat /etc/hosts |grep -v localhost |grep compute |awk '{print $1}'`
 
 fi
 
-echo -e "现在hosts详情为：\n"
-cat /etc/hosts
+
+#获取用户输入的密码
+read -p "输入远端节点root密码（要求全部节点密码一致）：" nodepw1
+if [ ${nodepw1} == "" ]
+then  
+	echo -e "密码不能为空,请重新输入.\n" 
+	read -p "输入远端节点root密码（要求全部节点密码一致）：" nodepw1
+fi
+
+read -p "请再次输入远端节点root密码（要求全部节点密码一致）：" nodepw2
+if [ ${nodepw2} == "" ] 
+then  
+        echo -e "密码不能为空,请重新输入.\n" 
+        read -p "输入远端节点root密码（要求全部节点密码一致）：" nodepw2
+fi
+
+if [ ${nodepw1} == ${nodepw2} ] 
+then 	
+	#把密码写入到./nodepw
+	echo ${nodepw2} > ./nodepw
+else
+	echo "两次输入密码不相同，请重新尝试！"
+fi 
+
 
 #调用ssh_truset.sh 设置其他节点ssh互信免密码。
-bash /root/ssh_truest.sh && echo -e "执行ssh_truesh.sh成功！\n"
-
+bash ./ssh_truest.sh && echo -e "执行ssh_truesh.sh成功！\n"
 
 #优化一下linux常用设置
 sed -i "s/SELINUX=enforcing/SELINUX=disabled/g" /etc/selinux/config &&  setenforce 0 &>/dev/null
@@ -84,20 +111,15 @@ mount -a
 
 if [ $? == 0 ] ;
 then 
-	echo -e "配置自动挂载点/iso/rhel-server-7.1-x86_64-dvd.iso--->/var/www/html/dvd  成功\n\
- 配置自动挂载点/iso/rhel-osp-6.0-2015-02-23.2-x86_64.iso--->/var/www/html/openstack  成功\n" 
+	echo -e "配置自动挂载点/iso/rhel-server-7.1-x86_64-dvd.iso--->/var/www/html/dvd  成功\n"
+	echo -e "配置自动挂载点/iso/rhel-osp-6.0-2015-02-23.2-x86_64.iso--->/var/www/html/openstack  成功\n" 
 fi 
-
 
 sed -i "s/#allow.*/allow all/g" /etc/chrony.conf && sed -i "s/#local stratum 10/local stratum 10/g" /etc/chrony.conf
 
-if [ $? == 0 ] ;then echo -e "修改chrony.conf参数 成功\n" ;fi 
-
 systemctl enable chronyd && systemctl restart  chronyd
-if [ $? == 0 ] ;then echo -e "chronyd启动 成功\n" ;fi 
 
 systemctl enable httpd && systemctl restart httpd
-if [ $? == 0 ] ;then echo -e "httpd启动 成功\n" ;fi 
 
 mv /etc/yum.repos.d/cdrom.repo /etc/yum.repos.d/cdrom.repo.bak
 if [ $? == 0 ] ;then echo -e "备份dvd.repo yum源文件 成功\n" ;fi 
@@ -136,9 +158,8 @@ EOF
 
 if [ $? == 0 ] ;then echo -e "创建web.repo yum源文件 成功\n" ;fi 
 
-
 yum repolist && yum makecache 
-if [ $? == 0 ] ;then echo -e "测试web.repo yum源 成功\n" ;fi 
+if [ $? == 0 ] ;then echo -e "测试web.repo yum源可用\n" ;fi 
 
 
 #同步配置文件到计算节点、控制节点
@@ -148,12 +169,14 @@ ssh root@controller " rm -rf /etc/yum.repos.d/* " && echo -e "删除controller�
 scp /etc/yum.repos.d/web.repo root@compute:/etc/yum.repos.d/ && echo -e " 拷贝/etc/yum.repos.d/web.repo到compute节点 成功\n" 
 scp /etc/yum.repos.d/web.repo root@controller:/etc/yum.repos.d/ && echo -e " 拷贝/etc/yum.repos.d/web.repo到controller节点 成功\n" 
 
-
 scp /etc/hosts root@compute:/etc/  && echo -e " 拷贝/etc/hosts到compute节点 成功\n" 
 scp /etc/hosts root@controller:/etc/ && echo -e " 拷贝/etc/hosts到controller节点 成功\n" 
 
 scp ./ssh_truest.sh root@compute:/root/  && echo -e " 拷贝ssh_truest.sh到compute节点 成功\n" 
 scp ./ssh_truest.sh root@controller:/root/ && echo -e " 拷贝ssh_truest.sh到controller节点 成功\n" 
+
+scp ./nodepw root@compute:/root/  && echo -e " 拷贝nodepw到compute节点 成功\n" 
+scp ./nodepw root@controller:/root/  && echo -e " 拷贝nodepw到controller节点 成功\n" 
 
 ssh root@compute " yum repolist && yum makecache " && echo -e "web.repo在compute节点上可用\n"
 ssh root@controller " yum repolist && yum makecache " && echo -e "web.repo在controller节点上可用\n"
@@ -191,15 +214,15 @@ ssh root@controller "
 sed -i \"/^server [1-3]/ s/^/#/\" /etc/chrony.conf 
 sed -i \"s/server 0.rhel.pool.ntp.org iburst/server ntp iburst/\" /etc/chrony.conf 
 systemctl enable chronyd && systemctl restart  chronyd
-ntpdate ntp && echo -e \"cmpute节点ntp服务正常\n\"
-bash /root/ssh_truest.sh && echo -e \"ssh互信成功\n\"" 
+ntpdate ntp && echo -e \"cmpute节点的ntp服务正常\n\"
+bash /root/ssh_truest.sh && echo -e \"controll节点设置ssh互信成功\n\"" 
 
 ssh root@compute " 
 sed -i \"/^server [1-3]/ s/^/#/\" /etc/chrony.conf 
 sed -i \"s/server 0.rhel.pool.ntp.org iburst/server ntp iburst/\" /etc/chrony.conf
 systemctl enable chronyd && systemctl restart  chronyd
-ntpdate ntp && echo -e \"cmpute节点ntp服务正常\n\"
-bash /root/ssh_truest.sh && echo -e \"ssh互信成功\n\""
+ntpdate ntp && echo -e \"cmpute节点的ntp服务正常\n\"
+bash /root/ssh_truest.sh && echo -e \"compute节点设置ssh互信成功\n\""
 
 #在controller节点上操作，用packstack部署openstack
 ssh root@controller "
@@ -223,3 +246,4 @@ sed -i "s/CONFIG_KEYSTONE_ADMIN_PW=.*/CONFIG_KEYSTONE_ADMIN_PW=adminh3c./g" /roo
 
 #根据应答文件，开始部署openstak
 ssh  root@controller "packstack --answer-file=/root/packstack.txt"
+

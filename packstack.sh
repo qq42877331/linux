@@ -242,8 +242,6 @@ sed -i "s/CONFIG_HORIZON_SSL=n/CONFIG_HORIZON_SSL=y/g" /root/packstack.txt
 sed -i "s/CONFIG_HEAT_INSTALL=n/CONFIG_HEAT_INSTALL=y/g" /root/packstack.txt
 sed -i "s/CONFIG_KEYSTONE_ADMIN_PW=.*/CONFIG_KEYSTONE_ADMIN_PW=adminh3c./g" /root/packstack.txt"
 
-
-
 #根据应答文件，开始部署openstak
 ssh  root@controller "packstack --answer-file=/root/packstack.txt"
 

@@ -26,12 +26,12 @@ then
 		if [ $ip != "q" ] && [ $ip != "Q" ]
 		then	
 			echo "$ip node${i}" >>/etc/hosts
+			i=$(($i+1))
 		else
 			q="yes"
 		fi
 	done
 fi 
-
 
 echo -e "目前hosts文件内容如下：\n" && cat /etc/hosts
 

@@ -36,7 +36,7 @@ pack_name=`ls -l ${dir1} |grep kernel*.rpm |awk -F " " '{print $9}'`
 if [ $pack_name == "" ] ; then echo -e "请准备好再尝试.\n" && exit ;fi
 
 #判断是否存在已经编译的版本
-if [ ! -f $dir1/rpmbuild/RPMS/x86_64/kernel-[0-9] ]
+if [ ! -f $dir1/rpmbuild/RPMS/x86_64/grep kernel-[0-9].*.rpm ]
 then 
 	#rm -rf ./rpmbuild 
 	rpm -ivh ${pack_name}
@@ -50,15 +50,15 @@ then
 	echo -e "编译内核包需要较长时间，请耐心等待。一会见!!!\n"
 	rpmbuild -ba $dir1/rpmbuild/SPECS/kernel.spec
 else
-	"检测到有已经编译的版本，不再重新编译。重新编译 rm -rf ./rpmbuild后重试.\n"
+	echo -e "检测到有已经编译的版本，不再重新编译。重新编译 rm -rf ./rpmbuild后重试.\n"
 fi 
 
 yn=""
-read "现在安装重编译后的kernel包吗？[yes or no ]:   " yn
+read -p "现在安装重编译后的kernel包吗？[yes or no ]:   " yn
 if [ $yn == "yes" ] || [ $yn == "y" ]
 then 
 	#安装新生成的内核rpm包
-	new_pack=$(ls -l $dir1/rpmbuild/RPMS/x86_64/ |awk -F " " '{print $9}'|grep kernel-[0-9])
+	new_pack=$(ll $dir1/rpmbuild/RPMS/x86_64/ |awk -F " " '{print $9}'|grep kernel-[0-9].*.rpm)
 	rpm -qpl $dir1/rpmbuild/RPMS/x86_64/${new_pack} |grep ocfs2
 	rpm -ivh $dir1/rpmbuild/RPMS/x86_64/${new_pack} && echo -e "内核包安装完成.\n"
 	#设置开机启动新版内核

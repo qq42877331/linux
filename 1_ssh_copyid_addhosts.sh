@@ -35,7 +35,7 @@ then
 fi 
 
 
-echo -e "目前hosts文件内容如下：\n" && cat /etc/hosts
+echo -e "/etc/hosts文件内容如下：\n" && cat /etc/hosts
 
 
 #生成本地ssh pubkey 

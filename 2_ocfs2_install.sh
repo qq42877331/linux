@@ -5,10 +5,12 @@ sed -i s/SELINUX=enforcing/SELINUX=disabled/g /etc/selinux/config &&  setenforce
 systemctl stop firewalld  && systemctl disable firewalld
 systemctl stop NetworkManager  && systemctl disable NetworkManager
 
-if [ ! -f /etc/yum.repos.d/Centos-7.repo ] 
-then 
+if [ ! -f /etc/yum.repos.d/Centos-7.repo ] || [ -f /etc/yum.repos.d/public-yum-ol7.repo ];then 
 	rm -rf /etc/yum.repos.d/*
 	curl http://mirrors.aliyun.com/repo/Centos-7.repo -o /etc/yum.repos.d/Centos-7.repo
+	curl http://public-yum.oracle.com/public-yum-ol7.repo -o /etc/yum.repos.d/public-yum-ol7.repo
+	sed -i "s/gpgcheck=1/gpgcheck=0/g" /etc/yum.repos.d/Centos-7.repo
+	sed -i "s/gpgcheck=1/gpgcheck=0/g" /etc/yum.repos.d/public-yum-ol7.repo
 	yum clean all && yum makecache 
 fi 
 
@@ -33,9 +35,7 @@ echo -e "浏览器打开，下载较新kernel源包，并确保该源包与此�
 dir1=`pwd`
 
 #判断是否存在已经编译的版本
-if [ ! -f $dir1/rpmbuild/RPMS/x86_64/grep kernel-[0-9].*.rpm ]
-then 	
-	
+if [ ! -d $dir1/rpmbuild  ] || [ ! -f $dir1/rpmbuild/RPMS/x86_64/grep kernel-[0-9].*.rpm ];then 	
 	pack_name=`ls -l ${dir1} |grep kernel*.rpm |awk -F " " '{print $9}'`
 	if [ -z $pack_name ] ; then echo -e "请准备好再尝试.\n" && exit ;fi
 	#rm -rf ./rpmbuild 
@@ -47,36 +47,44 @@ then
 	sed -i 's/\%define listnewconfig_fail 1/\%define listnewconfig_fail 0/' $dir1/rpmbuild/SPECS/kernel.spec
 
 	#重装编译一次内核包，需要很长时间
-	echo -e "编译内核包需要较长时间，请耐心等待。一会见!!!\n"
+	echo -e "编译内核包需要较长时间，请耐心等待。\n"
 	rpmbuild -ba $dir1/rpmbuild/SPECS/kernel.spec
 else
-	echo -e "检测到有已经编译的版本，不再重新编译。重新编译 rm -rf ./rpmbuild后重试.\n"
+	echo -e "检测到有已经编译的版本，无需重新编译。\n" 
 fi 
 
 yn=""
-read -p "现在安装重编译后的kernel包吗？[yes or no ]:   " yn
-if [ $yn == "yes" ] || [ $yn == "y" ]
-then 
+read -p "现在要安装重编译后的kernel包吗？[yes or no ]:   " yn
+if [ $yn == "yes" ] || [ $yn == "y" ];then 
 	#安装新生成的内核rpm包
-	new_pack=$(ls -l $dir1/rpmbuild/RPMS/x86_64/ |awk -F " " '{print $9}'|grep kernel-[0-9].*.rpm)
-	rpm -qpl $dir1/rpmbuild/RPMS/x86_64/${new_pack} |grep ocfs2
-	rpm -ivh $dir1/rpmbuild/RPMS/x86_64/${new_pack} && echo -e "内核包安装完成.\n"
+	new_pack=$(ls -l $dir1/rpmbuild/RPMS/x86_64/ |awk -F " " '{print $9}'|grep kernel-[0-9])
+	rpm -qpl $dir1/rpmbuild/RPMS/x86_64/${new_pack} |grep ocfs2 
+	if [ $? == 0 ];then
+		echo -e "$new_pack成功包含了ocfs2模块\n"
+		rpm -ivh $dir1/rpmbuild/RPMS/x86_64/${new_pack} && echo -e "内核包安装完成.\n"
+	fi
+fi
+
+yn=""
+read -p "设置新版本kernel为默认启动吗（重启生效）？[yes or no ]:   " yn
+if [ $yn == "yes" ] || [ $yn == "y" ];then 
 	#设置开机启动新版内核
 	sudo awk -F\' '$1=="menuentry " {print i++ " : " $2}' /etc/grub2.cfg
 	grub2-set-default 0 
 	grub2-mkconfig -o /boot/grub2/grub.cfg
-	
-	yn=""
-	read -p "kernel更新已经完成，你想现在重启此系统吗？ [ yes or no ]  :" yn
+fi	
 
-	if [ $yn == "y" ] || [ $yn == "yes" ]
-	then 
-		init 6
-	else
-		echo -e "ok ! 请稍后手动重启！\n"
-	fi
-	
+
+yn=""
+read -p "kernel更新已经完成，你想现在重启此系统吗？ [ yes or no ]  :" yn
+if [ $yn == "y" ] || [ $yn == "yes" ]
+then 
+	init 6
+else
+	echo -e "ok ! 请稍后手动重启！\n"
 fi
+	
+
 
 
 
